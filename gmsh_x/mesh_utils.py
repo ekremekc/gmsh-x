@@ -1,4 +1,5 @@
 import gmsh
+import sys
 
 def mirror_mesh_x_axis():
     # get the mesh data
