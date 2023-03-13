@@ -1,0 +1,9 @@
+README.md
+setup.py
+gmsh_x/__init__.py
+gmsh_x/gmsh_utils.py
+gmsh_x.egg-info/PKG-INFO
+gmsh_x.egg-info/SOURCES.txt
+gmsh_x.egg-info/dependency_links.txt
+gmsh_x.egg-info/requires.txt
+gmsh_x.egg-info/top_level.txt
