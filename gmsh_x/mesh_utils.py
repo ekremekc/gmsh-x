@@ -1,7 +1,7 @@
 import gmsh
 import sys
 
-def mirror_mesh_x_axis():
+def mirror_mesh_x_axis(reflection_axis = [1,-1,1]):
     # get the mesh data
     m = {}
     for e in gmsh.model.getEntities():
@@ -33,5 +33,31 @@ def mirror_mesh_x_axis():
             if (tx * ty * tz) < 0: # reverse the orientation
                 gmsh.model.mesh.reverse([(e[0], e[1] + offset_entity)])
 
-    transform(m, 1000, 100000, 100, 1, -1, 1)
+    mx,my,mz = reflection_axis[0],reflection_axis[1], reflection_axis[2]
+    transform(m, 1000, 100000, 100, mx, my, mz)
+    
     gmsh.model.mesh.removeDuplicateNodes()
+
+def fltk_options():
+
+    # Type of entity label (0: description,
+    #                       1: elementary entity tag,
+    #                       2: physical group tag)
+    gmsh.option.setNumber("Geometry.LabelType", 2)
+
+    gmsh.option.setNumber("Geometry.PointNumbers", 0)
+    gmsh.option.setNumber("Geometry.LineNumbers", 0)
+    gmsh.option.setNumber("Geometry.SurfaceNumbers", 2)
+    gmsh.option.setNumber("Geometry.VolumeNumbers", 2)
+
+    # Mesh coloring(0: by element type, 1: by elementary entity,
+    #                                   2: by physical group,
+    #                                   3: by mesh partition)
+    gmsh.option.setNumber("Mesh.ColorCarousel", 0)
+
+    gmsh.option.setNumber("Mesh.Lines", 0)
+    gmsh.option.setNumber("Mesh.SurfaceEdges", 0)
+    gmsh.option.setNumber("Mesh.SurfaceFaces", 0) # CHANGE THIS FLAG TO 0 TO SEE LABELS
+
+    gmsh.option.setNumber("Mesh.VolumeEdges", 2)
+    gmsh.option.setNumber("Mesh.VolumeFaces", 2)
