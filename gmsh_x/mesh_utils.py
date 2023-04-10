@@ -56,8 +56,8 @@ def fltk_options():
     gmsh.option.setNumber("Mesh.ColorCarousel", 0)
 
     gmsh.option.setNumber("Mesh.Lines", 0)
-    gmsh.option.setNumber("Mesh.SurfaceEdges", 0)
-    gmsh.option.setNumber("Mesh.SurfaceFaces", 0) # CHANGE THIS FLAG TO 0 TO SEE LABELS
+    gmsh.option.setNumber("Mesh.SurfaceEdges", 2)
+    gmsh.option.setNumber("Mesh.SurfaceFaces", 2) # CHANGE THIS FLAG TO 0 TO SEE LABELS
 
-    gmsh.option.setNumber("Mesh.VolumeEdges", 2)
-    gmsh.option.setNumber("Mesh.VolumeFaces", 2)
+    gmsh.option.setNumber("Mesh.VolumeEdges", 0)
+    gmsh.option.setNumber("Mesh.VolumeFaces", 0)
