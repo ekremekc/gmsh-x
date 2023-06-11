@@ -1,5 +1,18 @@
 import gmsh
 import sys
+import numpy as np
+
+def copyAndRotate(geometry, startAngle, N):
+    tags = [geometry[0]]
+    jumpAngle = 2*np.pi/N
+    angle = startAngle
+    for i in range(1, N):
+        copiedGeometry = gmsh.model.occ.copy(geometry)
+        tags.append(copiedGeometry[0])
+        angle += jumpAngle
+        gmsh.model.occ.rotate(copiedGeometry, 0, 0, 0, 0, 0, 1, angle)
+    gmsh.model.occ.synchronize()
+    return tags
 
 def mirror_mesh_x_axis(reflection_axis = [1,-1,1]):
     # get the mesh data
