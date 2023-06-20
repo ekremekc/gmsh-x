@@ -3,7 +3,7 @@ import numpy as np
 import gmsh
 
 geom_dir = "GeomDir/"
-mesh_dir = "2CubeMeshDir/"
+mesh_dir = "MeshDir/"
 
 gmsh.initialize()
 gmsh.option.setNumber("General.Terminal", 0)
@@ -54,8 +54,8 @@ gmsh.model.mesh.generate(3)
 gmsh.option.setNumber("Mesh.SaveAll", 0)
 gmsh.write("{}.msh".format(mesh_dir+"cubes"))
 
-# if '-nopopup' not in sys.argv:
-#     gmsh.fltk.run()
+if '-nopopup' not in sys.argv:
+    gmsh.fltk.run()
 
 gmsh.finalize()
 

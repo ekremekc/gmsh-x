@@ -3,10 +3,10 @@ import numpy as np
 import gmsh
 
 geom_dir = "GeomDir/"
-mesh_dir = "3CubeMeshdir/"
+mesh_dir = "MeshDir/"
 
 gmsh.initialize()
-gmsh.option.setNumber("General.Terminal", 0)
+gmsh.option.setNumber("General.Terminal", 1)
 
 gmsh.model.add("cubes")
 gmsh.option.setString('Geometry.OCCTargetUnit', 'M')
