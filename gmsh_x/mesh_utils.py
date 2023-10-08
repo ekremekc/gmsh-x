@@ -47,9 +47,56 @@ def mirror_mesh_x_axis(reflection_axis = [1,-1,1]):
                 gmsh.model.mesh.reverse([(e[0], e[1] + offset_entity)])
 
     mx,my,mz = reflection_axis[0],reflection_axis[1], reflection_axis[2]
+    max_node_tag = gmsh.model.mesh.getMaxNodeTag() 
+    max_element_tag = gmsh.model.mesh.getMaxElementTag() 
     transform(m, 1000, 100000, 100, mx, my, mz)
     
     gmsh.model.mesh.removeDuplicateNodes()
+
+def yaw(angle_deg):
+    angle = np.deg2rad(angle_deg)
+
+    yaw = np.array([[np.cos(angle), -np.sin(angle), 0],
+              [np.sin(angle),  np.cos(angle), 0],
+              [0,0,1]])
+    return yaw
+
+def getMeshData(gmsh_model):
+    # get the mesh data
+    m = {}
+    for e in gmsh_model.getEntities():
+        # print(e)
+        bnd = gmsh_model.getBoundary([e])
+        nod = gmsh_model.mesh.getNodes(e[0], e[1])
+        ele = gmsh_model.mesh.getElements(e[0], e[1])
+        m[e] = (bnd, nod, ele)
+    
+    return m
+
+# rotate the mesh and create new discrete entities to store it
+def rotate_z(m, offset_entity, offset_node, offset_element, yaw_angle):
+    for e in sorted(m):
+        gmsh.model.addDiscreteEntity(e[0], e[1] + offset_entity,
+                                    [abs(b[1]) + offset_entity for b in m[e][0]])
+
+        coord = []
+        for i in range(0, len(m[e][1][1]), 3):
+
+            point_old = m[e][1][1][i:i+3]
+            point_new = point_old @ yaw(yaw_angle)
+            x = point_new[0]
+            y = point_new[1]
+            z = point_new[2]
+            coord.append(x)
+            coord.append(y)
+            coord.append(z)
+        gmsh.model.mesh.addNodes(e[0], e[1] + offset_entity,
+                                    m[e][1][0] + offset_node, coord)
+        gmsh.model.mesh.addElements(e[0], e[1] + offset_entity, m[e][2][0],
+                                    [t + offset_element for t in m[e][2][1]],
+                                    [n + offset_node for n in m[e][2][2]])
+        gmsh.model.mesh.reverse([(e[0], e[1] + offset_entity)])
+
 
 def fltk_options():
 
