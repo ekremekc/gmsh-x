@@ -97,6 +97,19 @@ def rotate_z(m, offset_entity, offset_node, offset_element, yaw_angle):
                                     [n + offset_node for n in m[e][2][2]])
         gmsh.model.mesh.reverse([(e[0], e[1] + offset_entity)])
 
+def cart2cyl(x, y, z):
+    # cylindrical to Cartesian
+    rho = np.sqrt(x**2 + y**2)
+    phi = np.arctan2(y, x)
+    zeta = z
+    return rho, phi, zeta 
+
+def cyl2cart(rho, phi, zeta):
+    # cylindrical to Cartesian
+    x = rho * np.cos(phi)
+    y = rho * np.sin(phi)
+    z = zeta
+    return x, y, z
 
 def fltk_options():
 

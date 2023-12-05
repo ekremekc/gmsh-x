@@ -2,13 +2,7 @@ import gmsh
 import numpy as np
 from math import comb
 from pyevtk.hl import pointsToVTK
-
-def cart2cyl(x, y, z):
-    # cylindrical to Cartesian
-    rho = np.sqrt(x**2 + y**2)
-    phi = np.arctan2(y, x)
-    zeta = z
-    return rho, phi, zeta 
+from gmsh_x.mesh_utils import cart2cyl, cyl2cart
 
 class FFDBox:
     def __init__(self, gmsh_model, l, m , n, dim, tag=-1):
@@ -51,7 +45,7 @@ class FFDBox:
 
         self.P0 = np.array([self.Px[0, 0, 0], self.Py[0, 0, 0], self.Pz[0, 0, 0]])
 
-    def write_ffd_points(self, name="MeshDirFFD/FFDPoints"):
+    def write_ffd_points(self, name="MeshDir/FFDPoints"):
         """writes the FFD points as a vtu file (readable using ParaView).
         """
         
@@ -62,7 +56,7 @@ class FFDBox:
     
     def calcSTU(self, coords):
         """
-        Calc STU (parametric) coordinates
+        Calc STU (parametric) cartesian coordinates
         """
         xs = coords[0::3]
         ys = coords[1::3]
@@ -150,7 +144,6 @@ class FFDAngular:
 
         return s,t,u 
 
-
 class FFDCylindrical:
     def __init__(self, gmsh_model, l, m , n, dim, tag=-1, includeBoundary=False, parametric=True):
         """This class generates a cylindrical FFD Lattice 
@@ -171,6 +164,10 @@ class FFDCylindrical:
         self.Py = np.zeros((l,m,n))
         self.Pz = np.zeros((l,m,n))
 
+        self.Pr = np.zeros((l,m,n))
+        self.Pphi = np.zeros((l,m,n))
+        self.Pz = np.zeros((l,m,n))
+
         nodes, coords, param = gmsh_model.mesh.getNodes(dim, tag, includeBoundary, parametric)
 
         self.base_coords = coords
@@ -179,76 +176,55 @@ class FFDCylindrical:
         ys = coords[1::3]
         zs = coords[2::3]
 
-        self.dx = max(xs)-min(xs)
-        self.dy = max(ys)-min(ys)
-        self.dz = max(zs)-min(zs)
-
         rhos, phis, zetas = cart2cyl(xs, ys, zs)
-        if dim==2:
-            self.dr = max(rhos)
-        elif dim==3:
-            self.dr = max(rhos)
-        print(self.dr)
 
-        self.dphi = 2*np.pi/self.m
-        self.dz = max(zs)-min(zs)
+        self.dr = max(rhos)-min(rhos)
+        self.dphi = 2*np.pi
+        self.dz = max(zetas)-min(zetas)
 
         for i in range(l):
             for j in range(m):
                 for k in range(n):
-                    rho = 0  + self.dr * i / (l - 1)
-                    phi = self.dphi* j
-                    self.Px[i, j, k] = rho * np.cos(phi)
-                    self.Py[i, j, k] = rho * np.sin(phi)
-                    self.Pz[i, j, k] = min(zs)  + self.dz * k / (n - 1)
+                    self.Pr[i, j, k] = min(rhos)  + self.dr * i / (l - 1)
+                    self.Pphi[i, j, k] = min(phis)  + self.dphi * j / (m -1)
+                    self.Pz[i, j, k] = min(zetas)  + self.dz * k / (n -1)
 
-        self.P0 = np.array([0, 0, 0])
-        
-        self.Pr, self.Pphi, self.Pz = cart2cyl(self.Px, self.Py, self.Pz)
+        self.P0 = np.array([self.Pr[0, 0, 0], self.Pphi[0, 0, 0], self.Pz[0, 0, 0]])
 
     def write_ffd_points(self, name):
         """writes the FFD points as a vtu file (readable using ParaView).
         """
         
-        x_ffd = self.Px.flatten()
-        y_ffd = self.Py.flatten()
+        r_ffd = self.Pr.flatten()
+        phi_ffd = self.Pphi.flatten()
         z_ffd = self.Pz.flatten()
-        pointsToVTK(name, x_ffd, y_ffd, z_ffd)
+        x_ffd, y_ffd, z_ffd = cyl2cart(r_ffd, phi_ffd, z_ffd)
+        pointsToVTK("MeshDir/FFD", x_ffd, y_ffd, z_ffd)
         print("FFD points are saved.")
     
-    # def calcSTU(self, coords):
-    #     """
-    #     Calc STU (parametric) coordinates
-    #     """
-    #     xs = coords[0::3]
-    #     ys = coords[1::3]
-    #     zs = coords[2::3]
-
-    #     rhos, phis, zetas = cart2cyl(xs, ys, zs)
-    #     print(self.dr)
-
-    #     s = rhos/self.dr
-    #     t = phis/(2*np.pi)
-    #     u = zetas/self.dz
-    #     print(s)
-
-    #     return s,t,u 
-
     def calcSTU(self, coords):
+        """Calculates parametric coordinates for cylindrical lattice
+
+        Args:
+            coords (_type_): cartesian coordinates
+
+        Returns:
+            _type_: _description_
         """
-        Calc STU (parametric) coordinates
-        """
+
         xs = coords[0::3]
         ys = coords[1::3]
         zs = coords[2::3]
 
-        s = (xs - self.P0[0])/self.dx
-        t = (ys - self.P0[1])/self.dy
-        u = (zs - self.P0[2])/self.dz
+        rhos, phis, zetas = cart2cyl(xs, ys, zs)
 
-        return s,t,u
+        s = (rhos - self.P0[0])/self.dr
+        t = (phis - self.P0[1])/self.dphi
+        u = (zetas - self.P0[2])/self.dz
 
-def get_meshdata(gmsh_model):
+        return s,t,u 
+
+def getMeshdata(gmsh_model):
     """ Calculates the current mesh data which inputs the deformation function.
 
     Args:
@@ -278,7 +254,7 @@ def calcSTU(coords, P0, dx, dy, dz):
 
     return s,t,u
 
-def deform_mesh(gmsh_model, mesh_data, FFDVolume):
+def deformBoxFFD(gmsh_model, mesh_data, FFDVolume):
 
     for e in mesh_data:
     
@@ -302,10 +278,46 @@ def deform_mesh(gmsh_model, mesh_data, FFDVolume):
                                         comb(FFDVolume.n-1,k)*np.power(1-u[point], FFDVolume.n-1-k)*np.power(u[point],k) * \
                                         np.asarray([FFDVolume.Px[i,j,k], FFDVolume.Py[i,j,k], FFDVolume.Pz[i,j,k]])
 
-    new_coord = Xdef.flatten()
+        new_coord = Xdef.flatten()
+            
+        gmsh_model.addDiscreteEntity(e[0], e[1], [b[1] for b in mesh_data[e][0]])
+        gmsh_model.mesh.addNodes(e[0], e[1], mesh_data[e][1][0], new_coord)
+        gmsh_model.mesh.addElements(e[0], e[1], mesh_data[e][2][0], mesh_data[e][2][1], mesh_data[e][2][2])
+
+    return gmsh_model
+
+def deformCylindicalFFD(gmsh_model, mesh_data, CylindricalLattice):
+
+    l,m,n = CylindricalLattice.l,CylindricalLattice.m, CylindricalLattice.n
+    for e in mesh_data:
+
+        if len(mesh_data[e][1][1])==3:
+
+            old_coord = mesh_data[e][1][1]
+            s,t,u = CylindricalLattice.calcSTU(old_coord)
+            Xdef = np.zeros((1,3))
+
+        else:
+            old_coords = mesh_data[e][1][1]
+            s,t,u = CylindricalLattice.calcSTU(old_coords)
+            Xdef = np.zeros((int(len(old_coords)/3),3))
+        for point, param_s in enumerate(s):
+            for i in range(l):
+                for j in range(m):
+                    for k in range(n):
+                        Xdef[point] +=  comb(l-1,i)*np.power(1-s[point], l-1-i)*np.power(s[point],i) * \
+                                        comb(m-1,j)*np.power(1-t[point], m-1-j)*np.power(t[point],j) * \
+                                        comb(n-1,k)*np.power(1-u[point], n-1-k)*np.power(u[point],k) * \
+                                        np.asarray([CylindricalLattice.Pr[i,j,k], 
+                                                    CylindricalLattice.Pphi[i,j,k],
+                                                    CylindricalLattice.Pz[i,j,k]])
+
+        Xdef_3d_cart = Xdef.copy()
+        Xdef_3d_cart[:,0], Xdef_3d_cart[:,1],Xdef_3d_cart[:,2] = cyl2cart(Xdef[:,0], Xdef[:,1], Xdef[:,2]) 
+        new_coord = Xdef_3d_cart.flatten()
         
-    gmsh_model.addDiscreteEntity(e[0], e[1], [b[1] for b in mesh_data[e][0]])
-    gmsh_model.mesh.addNodes(e[0], e[1], mesh_data[e][1][0], new_coord)
-    gmsh_model.mesh.addElements(e[0], e[1], mesh_data[e][2][0], mesh_data[e][2][1], mesh_data[e][2][2])
+        gmsh.model.addDiscreteEntity(e[0], e[1], [b[1] for b in mesh_data[e][0]])
+        gmsh.model.mesh.addNodes(e[0], e[1], mesh_data[e][1][0], new_coord)
+        gmsh.model.mesh.addElements(e[0], e[1], mesh_data[e][2][0], mesh_data[e][2][1], mesh_data[e][2][2])
 
     return gmsh_model
