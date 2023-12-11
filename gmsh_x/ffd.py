@@ -154,7 +154,7 @@ class FFDCylindrical:
             m (int): number of points in the y direction
             n (int): number of points in the z direction
             dim (int): dimension of gmsh entity - 2 or 3
-            tag (int, optional): tag of the entity, -1 returns all tags. Defaults to -1.
+            tag (int, optional): physical tag of the entity, -1 returns all tags. Defaults to -1.
         """
         self.l = l
         self.m = m
@@ -167,10 +167,13 @@ class FFDCylindrical:
         self.Pr = np.zeros((l,m,n))
         self.Pphi = np.zeros((l,m,n))
         self.Pz = np.zeros((l,m,n))
-
-        nodes, coords, param = gmsh_model.mesh.getNodes(dim, tag, includeBoundary, parametric)
-
-        self.base_coords = coords
+        
+        if tag==-1:
+            elementary_tag = -1
+        else:
+            elementary_tag = gmsh.model.getEntitiesForPhysicalGroup(dim,tag)
+        
+        nodes, coords, param = gmsh_model.mesh.getNodes(dim, int(elementary_tag), includeBoundary, parametric)
 
         xs = coords[0::3]
         ys = coords[1::3]
@@ -191,7 +194,20 @@ class FFDCylindrical:
 
         self.P0 = np.array([self.Pr[0, 0, 0], self.Pphi[0, 0, 0], self.Pz[0, 0, 0]])
 
-    def write_ffd_points(self, name):
+        full_nodes, full_coords, full_param = gmsh_model.mesh.getNodes(dim, -1, True, True)
+        
+        xs_base = full_coords[0::3]
+        ys_base = full_coords[1::3]
+        zs_base = full_coords[2::3]
+
+        rhos_base, phis_base, zetas_base = cart2cyl(xs_base, ys_base, zs_base)
+
+
+        self.dr_base = max(rhos_base)-min(rhos_base)
+        self.dphi_base = 2*np.pi
+        self.dz_base = max(zetas_base)-min(zetas_base)
+
+    def write_ffd_points(self, name="MeshDir/FFD"):
         """writes the FFD points as a vtu file (readable using ParaView).
         """
         
@@ -199,8 +215,8 @@ class FFDCylindrical:
         phi_ffd = self.Pphi.flatten()
         z_ffd = self.Pz.flatten()
         x_ffd, y_ffd, z_ffd = cyl2cart(r_ffd, phi_ffd, z_ffd)
-        pointsToVTK("MeshDir/FFD", x_ffd, y_ffd, z_ffd)
-        print("FFD points are saved.")
+        pointsToVTK(name, x_ffd, y_ffd, z_ffd)
+        print("FFD points are saved as "+name+".vtu")
     
     def calcSTU(self, coords):
         """Calculates parametric coordinates for cylindrical lattice
@@ -240,9 +256,52 @@ def getMeshdata(gmsh_model):
                 gmsh_model.mesh.getElements(e[0], e[1]))
     return mesh_data
 
+def getLocalMeshdata(gmsh_model, dim, tag):
+    """ Calculates the current mesh data which inputs the deformation function.
+
+    Args:
+        gmsh_model (_type_): gmsh.model
+        tag: physical tag of the entity
+
+    Returns:
+        dictionary: mesh data
+    """
+    elementary_tag = gmsh.model.getEntitiesForPhysicalGroup(dim,tag)
+    xmin, ymin, zmin, xmax, ymax, zmax = gmsh.model.getBoundingBox(dim,int(elementary_tag))
+    
+    mesh_data = {}
+    for e in gmsh.model.getEntitiesInBoundingBox(xmin, ymin, zmin, xmax, ymax, zmax):
+        mesh_data[e] = (gmsh_model.getBoundary([e]),
+                gmsh_model.mesh.getNodes(e[0], e[1]),
+                gmsh_model.mesh.getElements(e[0], e[1]))
+    return mesh_data
+
+def getNonLocalMeshdata(gmsh_model, dim, tag):
+    """ Calculates the current nonlocal mesh data which inputs the deformation function.
+
+    Args:
+        gmsh_model (_type_): gmsh.model
+        tag: physical tag of the entity
+
+    Returns:
+        dictionary: mesh data
+    """
+    elementary_tag = gmsh.model.getEntitiesForPhysicalGroup(dim,tag)
+    xmin, ymin, zmin, xmax, ymax, zmax = gmsh.model.getBoundingBox(dim,int(elementary_tag))
+    local_entities = gmsh.model.getEntitiesInBoundingBox(xmin, ymin, zmin, xmax, ymax, zmax)
+    global_entities = gmsh.model.getEntities()
+    non_local_entities = list(set(global_entities) - set(local_entities))
+
+    mesh_data = {}
+    for e in non_local_entities:
+        mesh_data[e] = (gmsh_model.getBoundary([e]),
+                gmsh_model.mesh.getNodes(e[0], e[1]),
+                gmsh_model.mesh.getElements(e[0], e[1]))
+    return mesh_data
+
 def calcSTU(coords, P0, dx, dy, dz):
     """
-    Calc STU (parametric) coordinates
+    Calc STU (parametric) coordinates in cartesian grid
     """
     xs = coords[0::3]
     ys = coords[1::3]
@@ -319,5 +378,27 @@ def deformCylindicalFFD(gmsh_model, mesh_data, CylindricalLattice):
         gmsh.model.addDiscreteEntity(e[0], e[1], [b[1] for b in mesh_data[e][0]])
         gmsh.model.mesh.addNodes(e[0], e[1], mesh_data[e][1][0], new_coord)
         gmsh.model.mesh.addElements(e[0], e[1], mesh_data[e][2][0], mesh_data[e][2][1], mesh_data[e][2][2])
+
+    return gmsh_model
+
+def deformCylindicalLocalFFD(gmsh_model, local_mesh_data, nonlocal_mesh_data, CylindricalLattice):
+    # first, add local mesh data
+    gmsh.model = deformCylindicalFFD(gmsh.model, local_mesh_data, CylindricalLattice)
+    
+    # then add the nonlocal data
+    for e in sorted(nonlocal_mesh_data):
+        
+        coord = []
+        for i in range(0, len(nonlocal_mesh_data[e][1][1]), 3):
+            x = nonlocal_mesh_data[e][1][1][i]
+            y = nonlocal_mesh_data[e][1][1][i + 1]
+            z = nonlocal_mesh_data[e][1][1][i + 2]
+            coord.append(x)
+            coord.append(y)
+            coord.append(z)
+
+        gmsh.model.addDiscreteEntity(e[0], e[1], [b[1] for b in nonlocal_mesh_data[e][0]])
+        gmsh.model.mesh.addNodes(e[0], e[1], nonlocal_mesh_data[e][1][0], coord)
+        gmsh.model.mesh.addElements(e[0], e[1], nonlocal_mesh_data[e][2][0], nonlocal_mesh_data[e][2][1], nonlocal_mesh_data[e][2][2])
 
     return gmsh_model
