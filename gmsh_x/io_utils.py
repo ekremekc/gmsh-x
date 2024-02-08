@@ -64,9 +64,9 @@ def write_xdmf_mesh(name, dimension, write_edge=False):
 
     print(str(dimension)+"D XDMF mesh is generated.")
 
-def animate_pvds(pvdfile, filename, num_timesteps):
+def animate_pvds(pvdfilename, filename, num_timesteps, extension="_p0_000000"):
 
-    file1 = open(pvdfile, "w") 
+    file1 = open(pvdfilename, "w") 
 
     header = '<?xml version="1.0"?>'
     subheader1 = '<VTKFile type="Collection" version="0.1"'
@@ -87,8 +87,7 @@ def animate_pvds(pvdfile, filename, num_timesteps):
     file1.write("\n")
     for i in range(num_timesteps):
         timestep = str(i)
-        name = filename+timestep+'_p0_000000.vtu'
-
+        name = filename+timestep+extension+".vtu"
         dataset = '    <DataSet timestep="'+timestep+'" group="" part="0"'
         file1.write(dataset)
         file1.write("\n")

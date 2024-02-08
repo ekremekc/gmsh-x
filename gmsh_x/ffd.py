@@ -70,7 +70,7 @@ class FFDBox:
 
 class FFDAngular:
     def __init__(self, gmsh_model, l, m , n, dim, tag=-1, includeBoundary=False, parametric=True):
-        """This class generates a angular-shaped FFD Lattice 
+        """This class generates a angular FFD Lattice 
 
         Args:
             gmsh_model (gmsh.model): gmsh model (after meshing) 
@@ -78,7 +78,7 @@ class FFDAngular:
             m (int): number of points in the y direction
             n (int): number of points in the z direction
             dim (int): dimension of gmsh entity - 2 or 3
-            tag (int, optional): tag of the entity, -1 returns all tags. Defaults to -1.
+            tag (int, optional): physical tag of the entity, -1 returns all tags. Defaults to -1.
         """
         self.l = l
         self.m = m
@@ -88,9 +88,16 @@ class FFDAngular:
         self.Py = np.zeros((l,m,n))
         self.Pz = np.zeros((l,m,n))
 
-        nodes, coords, param = gmsh_model.mesh.getNodes(dim, tag, includeBoundary, parametric)
-
-        self.base_coords = coords
+        self.Pr = np.zeros((l,m,n))
+        self.Pphi = np.zeros((l,m,n))
+        self.Pz = np.zeros((l,m,n))
+        
+        if tag==-1:
+            elementary_tag = -1
+        else:
+            elementary_tag = gmsh.model.getEntitiesForPhysicalGroup(dim,tag)
+        
+        nodes, coords, param = gmsh_model.mesh.getNodes(dim, int(elementary_tag), includeBoundary, parametric)
 
         xs = coords[0::3]
         ys = coords[1::3]
@@ -100,47 +107,60 @@ class FFDAngular:
 
         self.dr = max(rhos)-min(rhos)
         self.dphi = max(phis)-min(phis)
-        self.dz = max(zs)-min(zs)
+        self.dz = max(zetas)-min(zetas)
 
         for i in range(l):
             for j in range(m):
                 for k in range(n):
-                    rho = min(rhos)  + self.dr * i / (l - 1)
-                    phi = min(phis)  + self.dphi * j / (m - 1)
-                    x = rho * np.cos(phi)
-                    y = rho * np.sin(phi)
-                    self.Px[i, j, k] = x
-                    self.Py[i, j, k] = y
-                    self.Pz[i, j, k] = min(zs)  + self.dz * k / (n - 1)
+                    self.Pr[i, j, k] = min(rhos)  + self.dr * i / (l - 1)
+                    self.Pphi[i, j, k] = min(phis)  + self.dphi * j / (m -1)
+                    self.Pz[i, j, k] = min(zetas)  + self.dz * k / (n -1)
 
-        self.P0 = np.array([self.Px[0, 0, 0], self.Py[0, 0, 0], self.Pz[0, 0, 0]])
+        self.P0 = np.array([self.Pr[0, 0, 0], self.Pphi[0, 0, 0], self.Pz[0, 0, 0]])
+
+        full_nodes, full_coords, full_param = gmsh_model.mesh.getNodes(dim, -1, True, True)
         
-        self.Pr, self.Pphi, self.Pz = cart2cyl(self.Px, self.Py, self.Pz)
+        xs_base = full_coords[0::3]
+        ys_base = full_coords[1::3]
+        zs_base = full_coords[2::3]
 
-    def write_ffd_points(self, name):
+        rhos_base, phis_base, zetas_base = cart2cyl(xs_base, ys_base, zs_base)
+
+
+        self.dr_base = max(rhos_base)-min(rhos_base)
+        self.dphi_base = max(phis_base)-min(phis_base)
+        self.dz_base = max(zetas_base)-min(zetas_base)
+
+    def write_ffd_points(self, name="MeshDir/FFD"):
         """writes the FFD points as a vtu file (readable using ParaView).
         """
         
-        x_ffd = self.Px.flatten()
-        y_ffd = self.Py.flatten()
+        r_ffd = self.Pr.flatten()
+        phi_ffd = self.Pphi.flatten()
         z_ffd = self.Pz.flatten()
+        x_ffd, y_ffd, z_ffd = cyl2cart(r_ffd, phi_ffd, z_ffd)
         pointsToVTK(name, x_ffd, y_ffd, z_ffd)
-        print("FFD points are saved.")
+        print("FFD points are saved as "+name+".vtu")
     
     def calcSTU(self, coords):
+        """Calculates parametric coordinates for cylindrical lattice
+
+        Args:
+            coords (_type_): cartesian coordinates
+
+        Returns:
+            _type_: _description_
         """
-        Calc STU (parametric) coordinates
-        """
+
         xs = coords[0::3]
         ys = coords[1::3]
         zs = coords[2::3]
 
         rhos, phis, zetas = cart2cyl(xs, ys, zs)
-        rho0, phi0, z0 = cart2cyl(self.P0[0], self.P0[1], self.P0[2])
 
-        s = (rhos - rho0)/self.dr
-        t = (phis - phi0)/self.dphi
-        u = (zetas - z0)/self.dz
+        s = (rhos - self.P0[0])/self.dr
+        t = (phis - self.P0[1])/self.dphi
+        u = (zetas - self.P0[2])/self.dz
 
         return s,t,u 
 
