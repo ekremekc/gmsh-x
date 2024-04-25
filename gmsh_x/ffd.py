@@ -74,9 +74,9 @@ class FFDAngular:
 
         Args:
             gmsh_model (gmsh.model): gmsh model (after meshing) 
-            l (int): number of points in the x direction
-            m (int): number of points in the y direction
-            n (int): number of points in the z direction
+            l (int): number of points in the radial direction
+            m (int): number of points in the azimuthal direction
+            n (int): number of points in the axial direction
             dim (int): dimension of gmsh entity - 2 or 3
             tag (int, optional): physical tag of the entity, -1 returns all tags. Defaults to -1.
         """
@@ -91,6 +91,8 @@ class FFDAngular:
         self.Pr = np.zeros((l,m,n))
         self.Pphi = np.zeros((l,m,n))
         self.Pz = np.zeros((l,m,n))
+
+        self.gmsh_model = gmsh_model
         
         if tag==-1:
             elementary_tag = -1
@@ -126,7 +128,6 @@ class FFDAngular:
 
         rhos_base, phis_base, zetas_base = cart2cyl(xs_base, ys_base, zs_base)
 
-
         self.dr_base = max(rhos_base)-min(rhos_base)
         self.dphi_base = max(phis_base)-min(phis_base)
         self.dz_base = max(zetas_base)-min(zetas_base)
@@ -141,6 +142,19 @@ class FFDAngular:
         x_ffd, y_ffd, z_ffd = cyl2cart(r_ffd, phi_ffd, z_ffd)
         pointsToVTK(name, x_ffd, y_ffd, z_ffd)
         print("FFD points are saved as "+name+".vtu")
+    
+    def write_flattened_coordinates(self, fname):
+
+        r_ffd = self.Pr.flatten()
+        phi_ffd = self.Pphi.flatten()
+        z_ffd = self.Pz.flatten()
+        x_ffd, y_ffd, z_ffd = cyl2cart(r_ffd, phi_ffd, z_ffd)
+
+        np.savetxt(fname+"_x.txt",x_ffd)
+        np.savetxt(fname+"_y.txt",y_ffd)
+        np.savetxt(fname+"_z.txt",z_ffd)
+
+        print("Flattened coordinates of FFD points are saved in "+fname+" for XYZ coordinates separately.")
     
     def calcSTU(self, coords):
         """Calculates parametric coordinates for cylindrical lattice
