@@ -302,9 +302,9 @@ def getLocalMeshdata(gmsh_model, dim, tag):
     """
     elementary_tag = gmsh.model.getEntitiesForPhysicalGroup(dim,tag)
     xmin, ymin, zmin, xmax, ymax, zmax = gmsh.model.getBoundingBox(dim,int(elementary_tag))
-    
+    local_entities = gmsh.model.getEntitiesInBoundingBox(xmin, ymin, zmin, xmax, ymax, zmax)
     mesh_data = {}
-    for e in gmsh.model.getEntitiesInBoundingBox(xmin, ymin, zmin, xmax, ymax, zmax):
+    for e in local_entities:
         mesh_data[e] = (gmsh_model.getBoundary([e]),
                 gmsh_model.mesh.getNodes(e[0], e[1]),
                 gmsh_model.mesh.getElements(e[0], e[1]))
@@ -325,6 +325,9 @@ def getNonLocalMeshdata(gmsh_model, dim, tag):
     local_entities = gmsh.model.getEntitiesInBoundingBox(xmin, ymin, zmin, xmax, ymax, zmax)
     global_entities = gmsh.model.getEntities()
     non_local_entities = list(set(global_entities) - set(local_entities))
+    print("LOCAL ENTITIES: ", local_entities)
+    print("NONLOCAL ENTITIES: ", non_local_entities)
+    print("GLOBAL ENTITIES: ", global_entities)
 
     mesh_data = {}
     for e in non_local_entities:
@@ -332,6 +335,40 @@ def getNonLocalMeshdata(gmsh_model, dim, tag):
                 gmsh_model.mesh.getNodes(e[0], e[1]),
                 gmsh_model.mesh.getElements(e[0], e[1]))
     return mesh_data
+
+
+def getLocalMeshdataNew(dim, tag):
+
+    vol_tag = gmsh.model.getEntitiesForPhysicalGroup(dim,tag)
+    sur_entities = list(set(gmsh.model.getBoundary([(dim,int(vol_tag))], combined=True, oriented=False)))
+    curve_entities = list(set(gmsh.model.getBoundary(sur_entities, combined=False, oriented=False)))
+    point_entities = list(set(gmsh.model.getBoundary(curve_entities, combined=False, oriented=False)))
+    # print(sur_entities)
+    # print(curve_entities)
+    # print("point_entities:",point_entities)
+
+    
+    local_entities = point_entities+curve_entities+sur_entities+[(dim,int(vol_tag))]
+    local_entities.sort(key=lambda element: (element[0], element[1]))
+    print("LOCAL ENTITIES: ", local_entities)
+    local_mesh_data = {}
+    for e in local_entities:
+        local_mesh_data[e] = (gmsh.model.getBoundary([e]),
+                gmsh.model.mesh.getNodes(e[0], e[1]),
+                gmsh.model.mesh.getElements(e[0], e[1]))
+
+    global_entities = gmsh.model.getEntities()
+    non_local_entities = list(set(global_entities) - set(local_entities))
+    print("NONLOCAL ENTITIES: ", non_local_entities)
+    print("GLOBAL ENTITIES: ", global_entities)
+
+    nonlocal_mesh_data = {}
+    for e in non_local_entities:
+        nonlocal_mesh_data[e] = (gmsh.model.getBoundary([e]),
+                gmsh.model.mesh.getNodes(e[0], e[1]),
+                gmsh.model.mesh.getElements(e[0], e[1]))
+    
+    return local_mesh_data, nonlocal_mesh_data
 
 def calcSTU(coords, P0, dx, dy, dz):
     """
