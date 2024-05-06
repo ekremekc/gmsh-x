@@ -337,18 +337,25 @@ def getNonLocalMeshdata(gmsh_model, dim, tag):
     return mesh_data
 
 
-def getLocalMeshdataNew(dim, tag):
+def getLocalMeshdataNew(dim, tags):
 
-    vol_tag = gmsh.model.getEntitiesForPhysicalGroup(dim,tag)
-    sur_entities = list(set(gmsh.model.getBoundary([(dim,int(vol_tag))], combined=True, oriented=False)))
-    curve_entities = list(set(gmsh.model.getBoundary(sur_entities, combined=False, oriented=False)))
-    point_entities = list(set(gmsh.model.getBoundary(curve_entities, combined=False, oriented=False)))
-    # print(sur_entities)
-    # print(curve_entities)
-    # print("point_entities:",point_entities)
+    local_entities = []
+    sur_entities = []
+    curve_entities = []
+    point_entities = []
+    for tag in tags:
+        vol_tags = gmsh.model.getEntitiesForPhysicalGroup(dim,tag)
 
+        for vol_tag in vol_tags:
+            sur_entities += list(set(gmsh.model.getBoundary([(dim,vol_tag)], combined=True, oriented=False)))
+        curve_entities = list(set(gmsh.model.getBoundary(sur_entities, combined=False, oriented=False)))
+        point_entities = list(set(gmsh.model.getBoundary(curve_entities, combined=False, oriented=False)))
+        # print(sur_entities)
+        # print(curve_entities)
+        # print("point_entities:",point_entities)
+
+        local_entities += point_entities+curve_entities+sur_entities+[(dim,int(vol_tag))]
     
-    local_entities = point_entities+curve_entities+sur_entities+[(dim,int(vol_tag))]
     local_entities.sort(key=lambda element: (element[0], element[1]))
     print("LOCAL ENTITIES: ", local_entities)
     local_mesh_data = {}
@@ -359,8 +366,8 @@ def getLocalMeshdataNew(dim, tag):
 
     global_entities = gmsh.model.getEntities()
     non_local_entities = list(set(global_entities) - set(local_entities))
-    print("NONLOCAL ENTITIES: ", non_local_entities)
-    print("GLOBAL ENTITIES: ", global_entities)
+    # print("NONLOCAL ENTITIES: ", non_local_entities)
+    # print("GLOBAL ENTITIES: ", global_entities)
 
     nonlocal_mesh_data = {}
     for e in non_local_entities:
