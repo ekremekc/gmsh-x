@@ -5,7 +5,7 @@ from pyevtk.hl import pointsToVTK
 from gmsh_x.mesh_utils import cart2cyl, cyl2cart
 
 class FFDBox:
-    def __init__(self, gmsh_model, l, m , n, dim, tag=-1):
+    def __init__(self, gmsh_model, l, m , n, dim, tag=-1, includeBoundary=True):
         """This class generates a box-shaped FFD Lattice 
 
         Args:
@@ -24,7 +24,7 @@ class FFDBox:
         self.Py = np.zeros((l,m,n))
         self.Pz = np.zeros((l,m,n))
 
-        nodes, coords, param = gmsh_model.mesh.getNodes(dim, tag, True, True)
+        nodes, coords, param = gmsh_model.mesh.getNodes(dim, tag, includeBoundary, True)
 
         self.base_coords = coords
 

@@ -12,6 +12,7 @@ setup(
         'meshio',
         'numpy',
         'matplotlib',
-        'scipy'
+        'scipy',
+        'pyevtk'
     ]
 )
